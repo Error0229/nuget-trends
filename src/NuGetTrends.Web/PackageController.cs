@@ -70,6 +70,41 @@ public class PackageController(
         return Ok(new { Id = id, Downloads = downloads });
     }
 
+    [HttpGet("chart/{id}.svg")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetDownloadChartSvg(
+        [FromRoute] string id,
+        CancellationToken cancellationToken,
+        [FromQuery] int months = 3)
+    {
+        if (months < 1 || months > MaxMonthsAllowed)
+        {
+            return BadRequest($"The 'months' parameter must be between 1 and {MaxMonthsAllowed}.");
+        }
+
+        var packageId = await context.PackageDownloads
+            .Where(p => p.PackageIdLowered == id.ToLower(CultureInfo.InvariantCulture))
+            .Select(p => p.PackageId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (packageId is null)
+        {
+            return NotFound();
+        }
+
+        var downloads = await clickHouseService.GetWeeklyDownloadsAsync(id, months, cancellationToken);
+        if (downloads.Count == 0)
+        {
+            logger.LogWarning("Package '{PackageId}' has no download history for SVG chart rendering", packageId);
+        }
+
+        var svg = PackageTrendSvgRenderer.Render(packageId, downloads, months);
+        Response.Headers.CacheControl = "public,max-age=3600";
+        return Content(svg, "image/svg+xml; charset=utf-8");
+    }
+
     private const int MaxTrendingLimit = 100;
 
     /// <summary>

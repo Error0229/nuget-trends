@@ -154,6 +154,48 @@ public class SearchApiContractTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ChartSvgApi_ReturnsSvgForExistingPackage()
+    {
+        var package = _fixture.ImportedPackages.First();
+
+        var response = await _client.GetAsync(
+            $"/api/package/chart/{Uri.EscapeDataString(package.PackageId)}.svg?months=3");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType.Should().NotBeNull();
+        response.Content.Headers.ContentType!.MediaType.Should().Be("image/svg+xml");
+        response.Headers.CacheControl.Should().NotBeNull();
+        response.Headers.CacheControl!.Public.Should().BeTrue();
+
+        var svg = await response.Content.ReadAsStringAsync();
+        _output.WriteLine(svg);
+
+        svg.Should().Contain("<svg");
+        svg.Should().Contain(package.PackageId);
+        svg.Should().Contain("Latest weekly avg/day");
+    }
+
+    [Fact]
+    public async Task ChartSvgApi_NonExistentPackage_Returns404()
+    {
+        var response = await _client.GetAsync(
+            "/api/package/chart/ThisPackageDoesNotExist12345.svg?months=3");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task ChartSvgApi_InvalidMonths_Returns400()
+    {
+        var package = _fixture.ImportedPackages.First();
+
+        var response = await _client.GetAsync(
+            $"/api/package/chart/{Uri.EscapeDataString(package.PackageId)}.svg?months=0");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task SearchThenHistory_FullDropdownFlow_WorksEndToEnd()
     {
         // This test simulates the full flow that SearchInput.razor performs:
