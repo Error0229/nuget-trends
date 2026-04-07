@@ -13,6 +13,14 @@ internal static class PackageTrendSvgRenderer
     private const double ChartTop = 64;
     private const double ChartWidth = 688;
     private const double ChartHeight = 262;
+    private const string FontFamily = "system-ui, sans-serif";
+    private const string BackgroundStroke = "#dbe4f0";
+    private const string GridStroke = "#e2e8f0";
+    private const string PlotBackground = "#ffffff";
+    private const string TitleFill = "#0f172a";
+    private const string MutedFill = "#64748b";
+    private const string EmptyStateFill = "#334155";
+    private const string AccentFill = "#2563eb";
     private static readonly XNamespace SvgNamespace = "http://www.w3.org/2000/svg";
 
     public static string Render(string packageId, IReadOnlyList<DailyDownloadResult> downloads, int months)
@@ -39,35 +47,10 @@ internal static class PackageTrendSvgRenderer
                     new XAttribute("id", "desc"),
                     $"NuGet Trends chart for {packageId}. {chartTitle}."),
                 CreateDefs(),
-                CreateElement("rect",
-                    ("x", "0"),
-                    ("y", "0"),
-                    ("width", Width.ToString(CultureInfo.InvariantCulture)),
-                    ("height", Height.ToString(CultureInfo.InvariantCulture)),
-                    ("rx", "18"),
-                    ("fill", "url(#chart-bg)"),
-                    ("stroke", "#dbe4f0")),
-                CreateElement("text", packageId,
-                    ("x", Format(ChartLeft)),
-                    ("y", "34"),
-                    ("fill", "#0f172a"),
-                    ("font-size", "24"),
-                    ("font-family", "system-ui, sans-serif"),
-                    ("font-weight", "700")),
-                CreateElement("text", chartTitle,
-                    ("x", Format(ChartLeft)),
-                    ("y", "54"),
-                    ("fill", "#64748b"),
-                    ("font-size", "13"),
-                    ("font-family", "system-ui, sans-serif")),
-                CreateElement("rect",
-                    ("x", Format(ChartLeft)),
-                    ("y", Format(ChartTop)),
-                    ("width", Format(ChartWidth)),
-                    ("height", Format(ChartHeight)),
-                    ("rx", "12"),
-                    ("fill", "#ffffff"),
-                    ("stroke", "#e2e8f0")),
+                CreateRect(0, 0, Width, Height, "url(#chart-bg)", BackgroundStroke, rx: 18),
+                CreateText(packageId, ChartLeft, 34, TitleFill, 24, fontWeight: "700"),
+                CreateText(chartTitle, ChartLeft, 54, MutedFill, 13),
+                CreateRect(ChartLeft, ChartTop, ChartWidth, ChartHeight, PlotBackground, GridStroke, rx: 12),
                 points.Count == 0
                     ? CreateEmptyState()
                     : CreateChart(points)));
@@ -86,12 +69,8 @@ internal static class PackageTrendSvgRenderer
                 new XAttribute("y1", "0%"),
                 new XAttribute("x2", "0%"),
                 new XAttribute("y2", "100%"),
-                CreateElement("stop",
-                    ("offset", "0%"),
-                    ("stop-color", "#ffffff")),
-                CreateElement("stop",
-                    ("offset", "100%"),
-                    ("stop-color", "#f8fafc"))));
+                CreateStop("0%", "#ffffff"),
+                CreateStop("100%", "#f8fafc")));
     }
 
     private static IEnumerable<XElement> CreateEmptyState()
@@ -100,22 +79,11 @@ internal static class PackageTrendSvgRenderer
         var centerY = ChartTop + ChartHeight / 2;
 
         return CreateGrid(0, 4_000, null)
-            .Append(CreateElement("text", "No download history yet",
-                ("x", Format(centerX)),
-                ("y", Format(centerY - 8)),
-                ("text-anchor", "middle"),
-                ("fill", "#334155"),
-                ("font-size", "18"),
-                ("font-family", "system-ui, sans-serif"),
-                ("font-weight", "600")))
-            .Append(CreateElement("text",
+            .Append(CreateText("No download history yet", centerX, centerY - 8, EmptyStateFill, 18,
+                anchor: "middle", fontWeight: "600"))
+            .Append(CreateText(
                 "The package exists, but NuGet Trends has not collected weekly data for it yet.",
-                ("x", Format(centerX)),
-                ("y", Format(centerY + 16)),
-                ("text-anchor", "middle"),
-                ("fill", "#64748b"),
-                ("font-size", "13"),
-                ("font-family", "system-ui, sans-serif")));
+                centerX, centerY + 16, MutedFill, 13, anchor: "middle"));
     }
 
     private static IEnumerable<XElement> CreateChart(IReadOnlyList<DailyDownloadResult> points)
@@ -135,32 +103,15 @@ internal static class PackageTrendSvgRenderer
             .Append(CreateElement("path",
                 ("d", BuildPath(points, firstWeek, totalDays, yMin, yMax)),
                 ("fill", "none"),
-                ("stroke", "#2563eb"),
+                ("stroke", AccentFill),
                 ("stroke-width", "3"),
                 ("stroke-linecap", "round"),
                 ("stroke-linejoin", "round")))
-            .Append(CreateElement("circle",
-                ("cx", Format(latestCoordinates.X)),
-                ("cy", Format(latestCoordinates.Y)),
-                ("r", "5"),
-                ("fill", "#2563eb"),
-                ("stroke", "#ffffff"),
-                ("stroke-width", "2")))
-            .Append(CreateElement("text", FormatCount(latest.Count!.Value),
-                ("x", Format(ChartLeft + ChartWidth)),
-                ("y", "34"),
-                ("text-anchor", "end"),
-                ("fill", "#0f172a"),
-                ("font-size", "22"),
-                ("font-family", "system-ui, sans-serif"),
-                ("font-weight", "700")))
-            .Append(CreateElement("text", "Latest weekly avg/day",
-                ("x", Format(ChartLeft + ChartWidth)),
-                ("y", "54"),
-                ("text-anchor", "end"),
-                ("fill", "#64748b"),
-                ("font-size", "13"),
-                ("font-family", "system-ui, sans-serif")));
+            .Append(CreateCircle(latestCoordinates.X, latestCoordinates.Y, 5, AccentFill, "#ffffff", 2))
+            .Append(CreateText(FormatCount(latest.Count!.Value), ChartLeft + ChartWidth, 34, TitleFill, 22,
+                anchor: "end", fontWeight: "700"))
+            .Append(CreateText("Latest weekly avg/day", ChartLeft + ChartWidth, 54, MutedFill, 13,
+                anchor: "end"));
     }
 
     private static IEnumerable<XElement> CreateGrid(
@@ -176,20 +127,9 @@ internal static class PackageTrendSvgRenderer
             var y = ChartTop + ChartHeight - ratio * ChartHeight;
             var value = yMin + ratio * (yMax - yMin);
 
-            elements.Add(CreateElement("line",
-                ("x1", Format(ChartLeft)),
-                ("y1", Format(y)),
-                ("x2", Format(ChartLeft + ChartWidth)),
-                ("y2", Format(y)),
-                ("stroke", "#e2e8f0"),
-                ("stroke-width", "1")));
-            elements.Add(CreateElement("text", FormatCount((long)Math.Round(value)),
-                ("x", Format(ChartLeft - 10)),
-                ("y", Format(y + 4)),
-                ("text-anchor", "end"),
-                ("fill", "#64748b"),
-                ("font-size", "12"),
-                ("font-family", "system-ui, sans-serif")));
+            elements.Add(CreateLine(ChartLeft, y, ChartLeft + ChartWidth, y, GridStroke, 1));
+            elements.Add(CreateText(FormatCount((long)Math.Round(value)), ChartLeft - 10, y + 4, MutedFill, 12,
+                anchor: "end"));
         }
 
         if (points is null || points.Count == 0)
@@ -213,13 +153,8 @@ internal static class PackageTrendSvgRenderer
 
     private static XElement CreateXLabel(double x, DateTime date, string anchor)
     {
-        return CreateElement("text", date.ToString("MMM yyyy", CultureInfo.InvariantCulture),
-            ("x", Format(x)),
-            ("y", Format(ChartTop + ChartHeight + 24)),
-            ("text-anchor", anchor),
-            ("fill", "#64748b"),
-            ("font-size", "12"),
-            ("font-family", "system-ui, sans-serif"));
+        return CreateText(date.ToString("MMM yyyy", CultureInfo.InvariantCulture),
+            x, ChartTop + ChartHeight + 24, MutedFill, 12, anchor);
     }
 
     private static string BuildPath(
@@ -286,6 +221,105 @@ internal static class PackageTrendSvgRenderer
         return new XElement(SvgNamespace + name,
             attributes.Select(a => new XAttribute(a.Name, a.Value)),
             content);
+    }
+
+    private static XElement CreateRect(
+        double x,
+        double y,
+        double width,
+        double height,
+        string fill,
+        string stroke,
+        double? rx = null)
+    {
+        var attributes = new List<(string Name, string Value)>
+        {
+            ("x", Format(x)),
+            ("y", Format(y)),
+            ("width", Format(width)),
+            ("height", Format(height)),
+            ("fill", fill),
+            ("stroke", stroke)
+        };
+
+        if (rx.HasValue)
+        {
+            attributes.Add(("rx", Format(rx.Value)));
+        }
+
+        return CreateElement("rect", attributes.ToArray());
+    }
+
+    private static XElement CreateLine(
+        double x1,
+        double y1,
+        double x2,
+        double y2,
+        string stroke,
+        double strokeWidth)
+    {
+        return CreateElement("line",
+            ("x1", Format(x1)),
+            ("y1", Format(y1)),
+            ("x2", Format(x2)),
+            ("y2", Format(y2)),
+            ("stroke", stroke),
+            ("stroke-width", Format(strokeWidth)));
+    }
+
+    private static XElement CreateCircle(
+        double cx,
+        double cy,
+        double radius,
+        string fill,
+        string stroke,
+        double strokeWidth)
+    {
+        return CreateElement("circle",
+            ("cx", Format(cx)),
+            ("cy", Format(cy)),
+            ("r", Format(radius)),
+            ("fill", fill),
+            ("stroke", stroke),
+            ("stroke-width", Format(strokeWidth)));
+    }
+
+    private static XElement CreateText(
+        string content,
+        double x,
+        double y,
+        string fill,
+        int fontSize,
+        string? anchor = null,
+        string? fontWeight = null)
+    {
+        var attributes = new List<(string Name, string Value)>
+        {
+            ("x", Format(x)),
+            ("y", Format(y)),
+            ("fill", fill),
+            ("font-size", fontSize.ToString(CultureInfo.InvariantCulture)),
+            ("font-family", FontFamily)
+        };
+
+        if (anchor is not null)
+        {
+            attributes.Add(("text-anchor", anchor));
+        }
+
+        if (fontWeight is not null)
+        {
+            attributes.Add(("font-weight", fontWeight));
+        }
+
+        return CreateElement("text", content, attributes.ToArray());
+    }
+
+    private static XElement CreateStop(string offset, string stopColor)
+    {
+        return CreateElement("stop",
+            ("offset", offset),
+            ("stop-color", stopColor));
     }
 
     private static string Format(double value)
