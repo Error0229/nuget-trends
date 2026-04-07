@@ -21,6 +21,7 @@ internal static class PackageTrendSvgRenderer
     private const string MutedFill = "#64748b";
     private const string EmptyStateFill = "#334155";
     private const string AccentFill = "#2563eb";
+    private const string AccentFillSoft = "#60a5fa";
     private static readonly XNamespace SvgNamespace = "http://www.w3.org/2000/svg";
 
     public static string Render(string packageId, IReadOnlyList<DailyDownloadResult> downloads, int months)
@@ -70,7 +71,15 @@ internal static class PackageTrendSvgRenderer
                 new XAttribute("x2", "0%"),
                 new XAttribute("y2", "100%"),
                 CreateStop("0%", "#ffffff"),
-                CreateStop("100%", "#f8fafc")));
+                CreateStop("100%", "#f8fafc")),
+            new XElement(SvgNamespace + "linearGradient",
+                new XAttribute("id", "chart-area"),
+                new XAttribute("x1", "0%"),
+                new XAttribute("y1", "0%"),
+                new XAttribute("x2", "0%"),
+                new XAttribute("y2", "100%"),
+                CreateStop("0%", AccentFill, "0.26"),
+                CreateStop("100%", AccentFill, "0.02")));
     }
 
     private static IEnumerable<XElement> CreateEmptyState()
@@ -98,10 +107,26 @@ internal static class PackageTrendSvgRenderer
 
         var latest = points[^1];
         var latestCoordinates = GetCoordinates(latest, firstWeek, totalDays, yMin, yMax);
+        var coordinates = points
+            .Select(point => GetCoordinates(point, firstWeek, totalDays, yMin, yMax))
+            .ToList();
+        var smoothPath = BuildSmoothPath(coordinates);
 
         return CreateGrid(yMin, yMax, points)
             .Append(CreateElement("path",
-                ("d", BuildPath(points, firstWeek, totalDays, yMin, yMax)),
+                ("d", BuildAreaPath(coordinates, smoothPath)),
+                ("fill", "url(#chart-area)"),
+                ("stroke", "none")))
+            .Append(CreateElement("path",
+                ("d", smoothPath),
+                ("fill", "none"),
+                ("stroke", AccentFillSoft),
+                ("stroke-opacity", "0.35"),
+                ("stroke-width", "6"),
+                ("stroke-linecap", "round"),
+                ("stroke-linejoin", "round")))
+            .Append(CreateElement("path",
+                ("d", smoothPath),
                 ("fill", "none"),
                 ("stroke", AccentFill),
                 ("stroke-width", "3"),
@@ -157,25 +182,69 @@ internal static class PackageTrendSvgRenderer
             x, ChartTop + ChartHeight + 24, MutedFill, 12, anchor);
     }
 
-    private static string BuildPath(
-        IReadOnlyList<DailyDownloadResult> points,
-        DateTime firstWeek,
-        double totalDays,
-        double yMin,
-        double yMax)
+    private static string BuildSmoothPath(IReadOnlyList<(double X, double Y)> coordinates)
     {
-        var builder = new StringBuilder();
-
-        for (var i = 0; i < points.Count; i++)
+        if (coordinates.Count == 0)
         {
-            var coordinates = GetCoordinates(points[i], firstWeek, totalDays, yMin, yMax);
-            builder.Append(i == 0 ? "M " : " L ");
-            builder.Append(Format(coordinates.X));
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder();
+        builder.Append("M ");
+        builder.Append(Format(coordinates[0].X));
+        builder.Append(' ');
+        builder.Append(Format(coordinates[0].Y));
+
+        if (coordinates.Count == 1)
+        {
+            return builder.ToString();
+        }
+
+        for (var i = 0; i < coordinates.Count - 1; i++)
+        {
+            var current = coordinates[i];
+            var next = coordinates[i + 1];
+            var previous = i > 0 ? coordinates[i - 1] : current;
+            var following = i + 2 < coordinates.Count ? coordinates[i + 2] : next;
+
+            var controlPoint1 = (
+                current.X + (next.X - previous.X) / 6d,
+                current.Y + (next.Y - previous.Y) / 6d);
+            var controlPoint2 = (
+                next.X - (following.X - current.X) / 6d,
+                next.Y - (following.Y - current.Y) / 6d);
+
+            builder.Append(" C ");
+            builder.Append(Format(controlPoint1.Item1));
             builder.Append(' ');
-            builder.Append(Format(coordinates.Y));
+            builder.Append(Format(controlPoint1.Item2));
+            builder.Append(", ");
+            builder.Append(Format(controlPoint2.Item1));
+            builder.Append(' ');
+            builder.Append(Format(controlPoint2.Item2));
+            builder.Append(", ");
+            builder.Append(Format(next.X));
+            builder.Append(' ');
+            builder.Append(Format(next.Y));
         }
 
         return builder.ToString();
+    }
+
+    private static string BuildAreaPath(IReadOnlyList<(double X, double Y)> coordinates, string smoothPath)
+    {
+        if (coordinates.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var baseline = ChartTop + ChartHeight;
+        var first = coordinates[0];
+        var last = coordinates[^1];
+
+        return
+            $"M {Format(first.X)} {Format(baseline)} L {Format(first.X)} {Format(first.Y)} " +
+            $"{smoothPath[2..]} L {Format(last.X)} {Format(baseline)} Z";
     }
 
     private static (double X, double Y) GetCoordinates(
@@ -315,11 +384,20 @@ internal static class PackageTrendSvgRenderer
         return CreateElement("text", content, attributes.ToArray());
     }
 
-    private static XElement CreateStop(string offset, string stopColor)
+    private static XElement CreateStop(string offset, string stopColor, string? stopOpacity = null)
     {
-        return CreateElement("stop",
+        var attributes = new List<(string Name, string Value)>
+        {
             ("offset", offset),
-            ("stop-color", stopColor));
+            ("stop-color", stopColor)
+        };
+
+        if (stopOpacity is not null)
+        {
+            attributes.Add(("stop-opacity", stopOpacity));
+        }
+
+        return CreateElement("stop", attributes.ToArray());
     }
 
     private static string Format(double value)
