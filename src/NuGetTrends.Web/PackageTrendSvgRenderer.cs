@@ -26,7 +26,7 @@ internal static class PackageTrendSvgRenderer
 
     public static string Render(string packageId, IReadOnlyList<DailyDownloadResult> downloads, int months)
     {
-        var chartTitle = $"Average daily downloads by week, last {months} month{(months == 1 ? "" : "s")}";
+        var chartTitle = $"Cumulative downloads, last {months} month{(months == 1 ? "" : "s")}";
         var points = downloads
             .Where(d => d.Count.HasValue)
             .OrderBy(d => d.Week)
@@ -135,7 +135,7 @@ internal static class PackageTrendSvgRenderer
             .Append(CreateCircle(latestCoordinates.X, latestCoordinates.Y, 5, AccentFill, "#ffffff", 2))
             .Append(CreateText(FormatCount(latest.Count!.Value), ChartLeft + ChartWidth, 34, TitleFill, 22,
                 anchor: "end", fontWeight: "700"))
-            .Append(CreateText("Latest weekly avg/day", ChartLeft + ChartWidth, 54, MutedFill, 13,
+            .Append(CreateText("Latest total downloads", ChartLeft + ChartWidth, 54, MutedFill, 13,
                 anchor: "end"));
     }
 

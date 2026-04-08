@@ -22,7 +22,7 @@ public class PackageTrendSvgRendererTests
         svg.Should().Contain("CodeFormatter.DevToys");
         svg.Should().Contain("<path d=\"M ");
         svg.Should().Contain("2.4K");
-        svg.Should().Contain("Latest weekly avg/day");
+        svg.Should().Contain("Latest total downloads");
     }
 
     [Fact]

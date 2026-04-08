@@ -172,7 +172,7 @@ public class SearchApiContractTests : IAsyncLifetime
 
         svg.Should().Contain("<svg");
         svg.Should().Contain(package.PackageId);
-        svg.Should().Contain("Latest weekly avg/day");
+        svg.Should().Contain("Latest total downloads");
     }
 
     [Fact]
